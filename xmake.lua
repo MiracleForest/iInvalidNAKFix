@@ -141,4 +141,4 @@ target("iInvalidNAKFix")
         os.runv("7z.exe", { "a", "-y", "-aoa", "-tzip", pack_path, "-r", output_dir, "-xr!*.pdb" })
     end)
 
--- cmd /v:on /c "cd /d D:\Github\MiracleForest\iInvalidNAKFix && for %v in (26.20.0 26.10.14 1.9.9 1.8.0-rc.2 1.7.7 1.6.1 1.5.2 1.4.4 1.3.4 1.2.1 1.1.2 1.0.1) do @(echo Building LL=%v && xmake f -c -y --levilamina_version=%v && xmake -r)"
+-- cmd /v:on /c "cd /d D:\Github\MiracleForest\iInvalidNAKFix && for %v in (26.20.0 26.10.14 1.9.9 1.7.7 1.7.0 1.6.1 1.5.2 1.4.4 1.3.4 1.2.1 1.1.2 1.0.1) do @(echo Building LL=%v && xmake f -c -y --levilamina_version=%v && xmake -r)"
