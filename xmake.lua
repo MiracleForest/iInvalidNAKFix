@@ -73,6 +73,7 @@ target("iInvalidNAKFix")
     set_symbols("debug")
     set_optimize("aggressive")
     set_strip("all")
+    add_links("Ws2_32")
     if version_ge(get_config("levilamina_version") or "26.10.14", "26.20.0") then
         set_toolchains("clang-cl")
         add_cxflags(
@@ -91,32 +92,6 @@ target("iInvalidNAKFix")
 
     after_load(function(target)
         target:add("defines", "VERSION_" .. get_bedrockdata_version(target):gsub("%.", "_") .. "=1")
-    end)
-
-    before_link(function(target)
-        import("lib.detect.find_file")
-        import("core.project.config")
-
-        -- 修复莫名其妙的环境变量缺失导致的链接失败
-        os.addenvs(target:pkgenvs())
-        target:add("shflags", "/DELAYLOAD:bedrock_runtime.dll")
-
-        local libdir = path.join(config.builddir(), ".prelink", "lib")
-        if os.exists(libdir) then os.rm(libdir) end
-        os.mkdir(libdir)
-
-        local data = assert(find_file("bedrock_runtime_data", {"$(env PATH)"}), "Cannot find bedrock_runtime_data")
-        local link = assert(find_file("prelink.exe", {"$(env PATH)"}), "Cannot find prelink.exe")
-
-        os.runv(link, {
-            string.format("%s-%s-%s", get_config("target_type"), target:plat(), target:arch()),
-            path.join(config.builddir(), ".prelink"),
-            data,
-            table.unpack(target:objectfiles())
-        })
-
-        target:add("linkdirs", libdir)
-        target:add("links", "bedrock_runtime_api")
     end)
 
     after_build(function (target)

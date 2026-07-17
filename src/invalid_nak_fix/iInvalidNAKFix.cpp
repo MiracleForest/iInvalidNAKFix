@@ -1,71 +1,106 @@
+// clang-format off
+#pragma include_alias("mc/deps/raknet/SystemAddress.h", "invalid_nak_fix/SystemAddress.h")
+#pragma include_alias(<mc/deps/raknet/SystemAddress.h>, <invalid_nak_fix/SystemAddress.h>)
+// clang-format on
+
 #include "invalid_nak_fix/iInvalidNAKFix.h"
 #include <ll/api/memory/Hook.h>
 #include <ll/api/mod/RegisterHelper.h>
-#include <mc/deps/raknet/ReliabilityLayer.h>
-// #include <mc/deps/raknet/RakNet.h>
-// #include <mc/deps/raknet/SystemAddress.h>
+#include <mc/deps/raknet/RakNet.h>
+#include <mc/deps/raknet/RakPeer.h>
+#include <mc/deps/raknet/SystemAddress.h>
 
 namespace mif::invalid_nak_fix {
 
 using namespace ll::memory_literals;
 
 #if defined(VERSION_1_21_50_10) || defined(VERSION_1_21_60_10)
-#  define FUNC_IDENTIFIER &RakNet::ReliabilityLayer::HandleSocketReceiveFromConnectedPlayer
+#  define FUNC_IDENTIFIER                                                                                              \
+      "?ProcessNetworkPacket@RakNet@@YAXUSystemAddress@1@PEBDHPEAVRakPeer@1@PEAVRakNetSocket2@1@_KAEAVBitStream@1@@Z"_sym
 #elif defined(VERSION_1_21_7004) || defined(VERSION_1_21_80) || defined(VERSION_1_21_93) || defined(VERSION_1_21_102)
 #  define FUNC_IDENTIFIER                                                                                              \
-      "48 8B C4 55 53 56 57 41 54 41 55 41 56 41 57 48 8D A8 ?? ?? ?? ?? 48 81 EC ?? ?? ?? ?? 0F 29 70 ?? 0F 29 78 ?? 44 0F 29 40 ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 85 ?? ?? ?? ?? 4D 8B E1"_sig
-#elif defined(VERSION_1_21_111) || defined(VERSION_1_21_120) || defined(VERSION_1_21_124)
-#  define FUNC_IDENTIFIER                                                                                              \
-      "48 8B C4 55 53 56 57 41 54 41 55 41 56 41 57 48 8D A8 ?? ?? ?? ?? 48 81 EC ?? ?? ?? ?? 0F 29 70 ?? 0F 29 78 ?? 44 0F 29 40 ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 85 ?? ?? ?? ?? 4D 8B E1 45 8B F8"_sig
-#elif defined(VERSION_1_21_132) || defined(VERSION_26_10_4)
-#  define FUNC_IDENTIFIER                                                                                              \
-      "48 8B C4 55 53 56 57 41 54 41 55 41 56 41 57 48 8D A8 ?? ?? ?? ?? 48 81 EC ?? ?? ?? ?? 0F 29 70 ?? 0F 29 78 ?? 44 0F 29 40 ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 85 ?? ?? ?? ?? 4D 8B E1 41 8B F8"_sig
+      "48 89 5C 24 ?? 48 89 74 24 ?? 55 41 54 41 55 41 56 41 57 48 8D 6C 24 ?? 48 81 EC ?? ?? ?? ?? 0F 28 01"_sig
+#elif defined(VERSION_1_21_111) || defined(VERSION_1_21_120) || defined(VERSION_1_21_124) || defined(VERSION_1_21_132) \
+    || defined(VERSION_26_10_4)
+#  define FUNC_IDENTIFIER "48 89 5C 24 ?? 55 41 54 41 55 41 56 41 57 48 8D 6C 24 ?? 48 81 EC ?? ?? ?? ?? 0F 28 01"_sig
 #elif defined(VERSION_26_20_5)
-#  define FUNC_IDENTIFIER                                                                                              \
-      "55 41 57 41 56 41 55 41 54 56 57 53 48 81 EC ?? ?? ?? ?? 48 8D AC 24 ?? ?? ?? ?? 48 C7 85 ?? ?? ?? ?? ?? ?? ?? ?? 4C 89 8D ?? ?? ?? ?? 45 89 C5"_sig
+#  define FUNC_IDENTIFIER "41 57 41 56 41 55 41 54 56 57 53 48 81 EC ?? ?? ?? ?? 4D 89 CE 44 89 C6"_sig
 #else
 #  error "Unsupported version"
 #endif
 
-LL_TYPE_INSTANCE_HOOK(
+LL_STATIC_HOOK(
     iInvalidNAKFix::HandleSocketReceiveHook,
     HookPriority::Normal,
-    RakNet::ReliabilityLayer,
     FUNC_IDENTIFIER,
-    bool,
-    char const*                                      buffer,
-    uint                                             length,
-    RakNet::SystemAddress&                           systemAddress,
-    DataStructures::List<RakNet::PluginInterface2*>& messageHandlerList,
-    int                                              MTUSize,
-    RakNet::RakNetSocket2*                           s,
-    RakNet::RakNetRandom*                            rnr,
-    uint64                                           timeRead,
-    RakNet::BitStream&                               updateBitStream
+    void,
+    RakNet::SystemAddress  systemAddress,
+    char const*            data,
+    int                    length,
+    RakNet::RakPeer*       rakPeer,
+    RakNet::RakNetSocket2* rakNetSocket,
+    uint64                 timeRead,
+    RakNet::BitStream&     updateBitStream
 ) {
-    // clang-format on
-    static std::array<std::byte, 10> invalidNAKPacket{
-        std::byte{0xA0},                                     // 数据报头部: bit[7]=isValid, bit[5]=isNAK -> 0b10100000
-        std::byte{0x00}, std::byte{0x01},                    // 区间个数: 1（大端无符号 16 位）
-        std::byte{0x00},                                     // 区间标志: 0 = 范围（需读取 min 和 max）
-        std::byte{0x00}, std::byte{0x00}, std::byte{0x00},   // min: 0
-        std::byte{0xFF}, std::byte{0xFF}, std::byte{0xFF}    // max: 0xFFFFFF (16777215)
+    auto origin = [&]() {
+        return HandleSocketReceiveHook::origin(
+            systemAddress,
+            data,
+            length,
+            rakPeer,
+            rakNetSocket,
+            timeRead,
+            updateBitStream
+        );
     };
-    // clang-format on
+    static constexpr auto readUint24BE = [](uint8_t const* ptr) constexpr {
+        return (static_cast<uint32_t>(ptr[0]) << 16) | (static_cast<uint32_t>(ptr[1]) << 8)
+             | (static_cast<uint32_t>(ptr[2]));
+    };
+    if (length < 1) return origin();
 
-    if (length < 10 || std::memcmp(buffer, invalidNAKPacket.data(), 10) != 0) {
-        return origin(buffer, length, systemAddress, messageHandlerList, MTUSize, s, rnr, timeRead, updateBitStream);
+
+    auto header  = static_cast<uint8_t>(data[0]);
+    auto isValid = (header >> 7) & 1;
+    auto isACK   = (header >> 6) & 1;
+    auto isNAK   = (header >> 5) & 1;
+    if (!isValid || !isNAK || isACK) return origin();
+    if (length < 3) return origin();
+
+    auto address = systemAddress.getIp();
+    if (address && rakPeer->IsBanned(address->c_str())) return;
+
+    auto rangeCount = (static_cast<uint16_t>(data[1]) << 8) | static_cast<uint16_t>(data[2]);
+
+    for (int offset = 3, index = 0; index < rangeCount; ++index) {
+        if (offset >= length) return origin();
+
+        auto flags   = static_cast<uint8_t>(data[offset++]);
+        auto isRange = (flags == 0);
+
+        if (offset + 3 > length) return origin();
+        auto minVal  = readUint24BE(reinterpret_cast<uint8_t const*>(data + offset));
+        offset      += 3;
+
+        auto maxVal = minVal;
+        if (isRange) {
+            if (offset + 3 > length) return origin();
+            maxVal  = readUint24BE(reinterpret_cast<uint8_t const*>(data + offset));
+            offset += 3;
+        }
+
+        if (maxVal == 0xFFFFFF) {
+            // getInstance().getSelf().getLogger().warn(
+            //     "Dangerous NAK range [{0}, 0xFFFFFF] received from {1}",
+            //     minVal,
+            //     address.value_or("Unknown Address")
+            // );
+            if (address) rakPeer->AddToBanList(address->c_str(), 0);
+            return;
+        }
     }
 
-    // getInstance().getSelf().getLogger().warn("Invalid NAK Packet received from {0}", [&]() {
-    //     if (systemAddress != RakNet::UNASSIGNED_SYSTEM_ADDRESS()) {
-    //         std::array<char, 71> buffer{};
-    //         systemAddress.ToString(false, buffer.data(), '|');
-    //         return strlen(buffer.data()) > 0 ? std::string{buffer.data()} : std::string{"Unknown Address"};
-    //     }
-    //     return std::string{"Unknown Address"};
-    // }());
-    return false;
+    return origin();
 }
 
 iInvalidNAKFix& iInvalidNAKFix::getInstance() {
