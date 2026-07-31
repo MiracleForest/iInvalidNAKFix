@@ -5,12 +5,12 @@ add_rules("plugin.compile_commands.autoupdate")
 add_repositories("levimc-repo https://github.com/LiteLDev/xmake-repo.git")
 
 option("levilamina_version")
-    set_default("26.10.14")
+    set_default("26.20.0")
     set_showmenu(true)
-    set_description("Set the levilamina version to use. Default is 26.10.14.")
+    set_description("Set the levilamina version to use. Default is 26.20.0.")
 option_end()
 
-add_requires("levilamina " .. (get_config("levilamina_version") or "26.10.14"), { configs = { target_type = "server" }})
+add_requires("levilamina " .. (get_config("levilamina_version") or "26.20.0"), { configs = { target_type = "server" }})
 
 if not has_config("vs_runtime") then set_runtimes("MD") end
 
@@ -74,7 +74,7 @@ target("iInvalidNAKFix")
     set_optimize("aggressive")
     set_strip("all")
     add_links("Ws2_32")
-    if version_ge(get_config("levilamina_version") or "26.10.14", "26.20.0") then
+    if version_ge(get_config("levilamina_version") or "26.20.0", "26.20.0") then
         set_toolchains("clang-cl")
         add_cxflags(
             "-Wno-microsoft-cast",
@@ -107,7 +107,9 @@ target("iInvalidNAKFix")
             format("%s/manifest.json", output_dir),
             {
                 name = target:name(),
-                entry = path.basename(artifact_file)
+                entry = path.basename(artifact_file),
+                version = "0.4.0-" .. get_bedrockdata_version(target),
+                author = "MiracleForest"
             }
         )
 

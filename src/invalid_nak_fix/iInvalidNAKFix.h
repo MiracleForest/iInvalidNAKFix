@@ -10,7 +10,7 @@ public:
         int version{1};
         struct {
             uint64 base{0xFFFFFF};
-            uint64 multiplier{45};
+            uint64 multiplier{10};
         } threshold;
         uint64 maxHistorySize{50};
         uint64 timeWindowMilliseconds{500};
